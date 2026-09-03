@@ -1,0 +1,30 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "창의적 소프트웨어 체험·활용반 사이트 API (FastAPI + MySQL)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.121.0",
+    "sqlalchemy>=2.0.36",
+    "pymysql>=1.1.1",
+    "cryptography>=44.0.0",
+    "alembic>=1.14.0",
+    "pydantic-settings>=2.7.0",
+    "pyjwt>=2.10.1",
+    "google-auth>=2.36.0",
+    "google-api-python-client>=2.155.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.15,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""

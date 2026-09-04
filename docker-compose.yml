@@ -3,16 +3,16 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_dev_pw
-      MYSQL_DATABASE: jgms_club
-      MYSQL_USER: jgms
-      MYSQL_PASSWORD: jgms_dev_pw
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_pw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-jgms_club}
+      MYSQL_USER: ${MYSQL_USER:-jgms}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-jgms_dev_pw}
     ports:
       - "33066:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-uroot", "-proot_dev_pw"]
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root_dev_pw}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,8 +23,9 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: mysql+pymysql://jgms:jgms_dev_pw@mysql:3306/jgms_club
-      FRONTEND_ORIGIN: http://localhost:5174
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-jgms}:${MYSQL_PASSWORD:-jgms_dev_pw}@mysql:3306/${MYSQL_DATABASE:-jgms_club}
+      # Local dev default; override in the root .env when deploying (e.g. https://jgms.imjemin.co.kr)
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5174}
     ports:
       - "8001:8000"
     volumes:
@@ -44,13 +45,25 @@ services:
     build: ./frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:8001
+      # Local dev default; override in the root .env when deploying (e.g. https://jgms-api.imjemin.co.kr)
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     ports:
       - "5174:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     depends_on:
+      - backend
+
+  # Only starts with `docker compose --profile tunnel up -d` (see README "서버 배포").
+  # Not needed for local development.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - frontend
       - backend
 
 volumes:

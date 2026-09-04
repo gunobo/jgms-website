@@ -129,8 +129,8 @@ cp .env.prod.example .env
 ```
 
 - `backend/.env`: 로컬 개발과 동일하게 `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `ADMIN_EMAILS`, (선택) 구글 시트 서비스 계정 값을 채웁니다. `GOOGLE_WORKSPACE_HD`로 학교 도메인 제한을 걸어두는 것을 권장합니다.
-- 루트 `.env`: MySQL 비밀번호(`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`)를 실제 운영용 값으로 바꾸고, `PUBLIC_URL`을 실제 도메인(예: `https://club.example.com`)으로 설정합니다. `CLOUDFLARE_TUNNEL_TOKEN`은 4-4에서 발급받아 채웁니다.
-- Google Cloud Console의 OAuth 클라이언트 **Authorized JavaScript origins**에도 이 도메인을 추가해야 로그인이 됩니다.
+- 루트 `.env`: MySQL 비밀번호(`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`)를 실제 운영용 값으로 바꾸고, `PUBLIC_URL`은 기본값인 `https://jgms.imjemin.co.kr`을 그대로 쓰면 됩니다. `CLOUDFLARE_TUNNEL_TOKEN`은 4-4에서 발급받아 채웁니다.
+- Google Cloud Console의 OAuth 클라이언트 **Authorized JavaScript origins**에 `https://jgms.imjemin.co.kr`을 추가해야 로그인이 됩니다.
 
 ### 4-3. 빌드 및 실행
 
@@ -149,13 +149,13 @@ docker compose -f docker-compose.prod.yml up -d --build
 1. [Cloudflare Zero Trust 대시보드](https://one.dash.cloudflare.com/) → **Networks → Tunnels → Create a tunnel**
 2. Connector 타입은 **Cloudflared** 선택, 터널 이름 입력 (예: `jgms-club`)
 3. 설치 명령어가 표시되는데, 그 안의 `--token` 뒤 값만 복사해서 루트 `.env`의 `CLOUDFLARE_TUNNEL_TOKEN`에 붙여넣습니다 (명령어 전체를 서버에서 실행할 필요 없음 — 이미 Docker 컨테이너로 떠 있음)
-4. 대시보드에서 이어서 **Public Hostname** 탭 → 도메인 입력, Service를 `HTTP` / `web:80`으로 설정 (컨테이너 내부 네트워크 이름이라 `web`이라고 입력하면 됩니다)
+4. 대시보드에서 이어서 **Public Hostname** 탭 → `jgms.imjemin.co.kr` 입력, Service를 `HTTP` / `web:80`으로 설정 (컨테이너 내부 네트워크 이름이라 `web`이라고 입력하면 됩니다)
 5. `.env` 저장 후 재기동:
    ```bash
    docker compose -f docker-compose.prod.yml up -d
    ```
 
-이제 대시보드에서 설정한 도메인으로 접속하면 서버의 사이트로 연결됩니다. Cloudflare가 HTTPS를 자동으로 처리해주므로 별도 인증서 설정이 필요 없습니다. `cloudflared` 컨테이너 로그는 `docker compose -f docker-compose.prod.yml logs -f cloudflared`로 확인할 수 있습니다.
+이제 `https://jgms.imjemin.co.kr`로 접속하면 서버의 사이트로 연결됩니다. Cloudflare가 HTTPS를 자동으로 처리해주므로 별도 인증서 설정이 필요 없습니다. `cloudflared` 컨테이너 로그는 `docker compose -f docker-compose.prod.yml logs -f cloudflared`로 확인할 수 있습니다.
 
 터널을 쓰지 않는다면 `docker-compose.prod.yml`에서 `cloudflared` 서비스를 지우고, 서버의 5106 포트를 직접 공유기 포트포워딩 등으로 열면 됩니다.
 

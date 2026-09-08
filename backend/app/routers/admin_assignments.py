@@ -78,7 +78,7 @@ def list_assignments(db: Session = Depends(get_db)):
     assignments = (
         db.query(Assignment)
         .options(selectinload(Assignment.criteria).selectinload(RubricCriterion.items))
-        .order_by(Assignment.created_at.desc())
+        .order_by(Assignment.created_at.asc())
         .all()
     )
     result = []

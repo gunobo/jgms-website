@@ -24,7 +24,7 @@ def _base_query(db: Session):
 @router.get("", response_model=list[AssignmentListItem])
 def list_assignments(db: Session = Depends(get_db), user: CurrentUser = Depends(require_student)):
     assignments = (
-        _base_query(db).filter(Assignment.is_published.is_(True)).order_by(Assignment.created_at.desc()).all()
+        _base_query(db).filter(Assignment.is_published.is_(True)).order_by(Assignment.created_at.asc()).all()
     )
     result = []
     for a in assignments:

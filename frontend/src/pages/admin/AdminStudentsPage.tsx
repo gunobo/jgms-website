@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { Student } from "../../api/types";
+import { SheetLinkPanel } from "../../components/SheetLinkPanel";
 
 export function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rosterSheetId, setRosterSheetId] = useState<string | null>(null);
 
   const [form, setForm] = useState({ name: "", studentId: "", email: "", grade: "", className: "" });
   const [bulkText, setBulkText] = useState("");
@@ -18,6 +20,10 @@ export function AdminStudentsPage() {
       .then(setStudents)
       .catch((e) => setError(e instanceof ApiError ? e.message : "불러오기에 실패했습니다."))
       .finally(() => setLoading(false));
+    api
+      .get<{ sheet_id: string | null }>("/api/admin/students/sheet")
+      .then((r) => setRosterSheetId(r.sheet_id))
+      .catch(() => {});
   };
 
   useEffect(load, []);
@@ -71,6 +77,18 @@ export function AdminStudentsPage() {
     <div className="space-y-8">
       <h1 className="text-xl font-bold text-gray-900">학생 명단 관리</h1>
       {error && <p className="rounded bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+
+      <SheetLinkPanel
+        sheetId={rosterSheetId}
+        onLink={async (url) => {
+          await api.post("/api/admin/students/sheet", { sheet_url_or_id: url });
+          load();
+        }}
+        onUnlink={async () => {
+          await api.del("/api/admin/students/sheet");
+          load();
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <form onSubmit={addStudent} className="space-y-3 rounded-lg border border-gray-200 bg-white p-5">

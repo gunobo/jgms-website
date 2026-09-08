@@ -176,6 +176,10 @@ class SheetLinkIn(BaseModel):
     sheet_url_or_id: str = Field(min_length=1)
 
 
+class RosterSheetOut(BaseModel):
+    sheet_id: str | None
+
+
 # --- Assignments / Rubric grading ---
 
 

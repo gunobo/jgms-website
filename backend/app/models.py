@@ -219,3 +219,14 @@ class Grade(Base):
 
     graded_by_id: Mapped[str] = mapped_column(ForeignKey("admins.id"))
     graded_by: Mapped["Admin"] = relationship()
+
+
+class RosterSheet(Base):
+    """Singleton row (id is always "singleton") holding the linked spreadsheet
+    that the student roster is kept in sync with."""
+
+    __tablename__ = "roster_sheet"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: "singleton")
+    sheet_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    sheet_tab: Mapped[str | None] = mapped_column(String(100), nullable=True)

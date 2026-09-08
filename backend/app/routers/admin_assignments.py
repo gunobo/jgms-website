@@ -20,6 +20,7 @@ from app.schemas import (
 )
 from app.sheets import (
     append_row,
+    create_spreadsheet,
     extract_spreadsheet_id,
     is_sheets_configured,
     make_tab_name,
@@ -98,6 +99,22 @@ def create_assignment(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
+
+    # Best-effort: auto-create and share a grading spreadsheet so the admin
+    # doesn't have to make one by hand. Never blocks assignment creation.
+    if is_sheets_configured():
+        try:
+            sheet_id = create_spreadsheet(f"{assignment.title} - 채점표", share_with_email=user.email)
+            rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
+            assignment.sheet_id = sheet_id
+            assignment.rubric_sheet_tab = rubric_tab
+            assignment.scores_sheet_tab = scores_tab
+            db.commit()
+            db.refresh(assignment)
+        except Exception:
+            db.rollback()
+            db.refresh(assignment)
+
     return _to_detail(assignment)
 
 
@@ -174,6 +191,18 @@ def _rubric_rows(assignment: Assignment) -> list[list[str]]:
     return rows
 
 
+def _write_assignment_sheets(assignment: Assignment, sheet_id: str) -> tuple[str, str]:
+    """Writes the rubric table + score header into (new or existing) tabs on
+    the given spreadsheet and returns the (rubric_tab, scores_tab) names used."""
+    rubric_tab = assignment.rubric_sheet_tab or make_tab_name(f"{assignment.title} 평가기준표", assignment.id)
+    scores_tab = assignment.scores_sheet_tab or make_tab_name(f"{assignment.title} 점수", assignment.id)
+
+    write_rows(sheet_id, rubric_tab, _rubric_rows(assignment))
+    item_labels = [f"{c.title} - {i.label}" for c, i in all_items(assignment)]
+    write_header(sheet_id, scores_tab, [*item_labels, "총점", "코멘트"])
+    return rubric_tab, scores_tab
+
+
 @router.post("/{assignment_id}/sheet", response_model=AssignmentDetail)
 def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_db)):
     if not is_sheets_configured():
@@ -183,13 +212,9 @@ def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_
         )
     assignment = _get_assignment_or_404(db, assignment_id)
     sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
-    rubric_tab = assignment.rubric_sheet_tab or make_tab_name(f"{assignment.title} 평가기준표", assignment.id)
-    scores_tab = assignment.scores_sheet_tab or make_tab_name(f"{assignment.title} 점수", assignment.id)
 
     try:
-        write_rows(sheet_id, rubric_tab, _rubric_rows(assignment))
-        item_labels = [f"{c.title} - {i.label}" for c, i in all_items(assignment)]
-        write_header(sheet_id, scores_tab, [*item_labels, "총점", "코멘트"])
+        rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

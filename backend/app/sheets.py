@@ -5,7 +5,12 @@ from googleapiclient.discovery import build
 
 from app.config import settings
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    # Only files the service account itself creates/opens — needed to share a
+    # newly auto-created spreadsheet back to a human (e.g. the admin).
+    "https://www.googleapis.com/auth/drive.file",
+]
 
 _SHEET_URL_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 
@@ -47,6 +52,48 @@ def _client():
         scopes=SCOPES,
     )
     return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+
+def _drive_client():
+    if not is_sheets_configured():
+        raise RuntimeError(
+            "Google Sheets 서비스 계정이 설정되지 않았습니다 "
+            "(GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY)."
+        )
+    private_key = settings.google_service_account_private_key.replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(
+        {
+            "client_email": settings.google_service_account_email,
+            "private_key": private_key,
+            "token_uri": "https://oauth2.googleapis.com/token",
+        },
+        scopes=SCOPES,
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def create_spreadsheet(title: str, share_with_email: str | None = None) -> str:
+    """Creates a new spreadsheet and (optionally) shares it with a human email
+    as an editor, since a service-account-created file is otherwise invisible
+    in that person's own Drive. Returns the new spreadsheet's id.
+    """
+    sheets_service = _client()
+    result = (
+        sheets_service.spreadsheets()
+        .create(body={"properties": {"title": title}}, fields="spreadsheetId")
+        .execute()
+    )
+    sheet_id = result["spreadsheetId"]
+
+    if share_with_email:
+        drive_service = _drive_client()
+        drive_service.permissions().create(
+            fileId=sheet_id,
+            body={"type": "user", "role": "writer", "emailAddress": share_with_email},
+            sendNotificationEmail=False,
+        ).execute()
+
+    return sheet_id
 
 
 def ensure_tab_exists(sheet_id: str, tab_name: str) -> None:

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,6 +9,8 @@ from app.models import Answer, Response, Student, Survey
 from app.schemas import ResponseSubmitIn, SurveyDetail, SurveyListItem
 from app.sheets import append_row
 from app.survey_utils import question_to_out
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/surveys", tags=["surveys"], dependencies=[Depends(require_student)])
 
@@ -146,7 +150,7 @@ def submit_response(
             response.synced_to_sheet = True
             db.commit()
         except Exception:
-            pass
+            logger.exception("Failed to sync response to sheet for response %s", response.id)
 
     return {"id": response.id}
 

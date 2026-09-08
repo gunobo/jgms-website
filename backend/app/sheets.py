@@ -27,13 +27,9 @@ def extract_spreadsheet_id(raw: str) -> str:
 _FORBIDDEN_TAB_CHARS = re.compile(r"[:\\/?*\[\]]")
 
 
-def make_tab_name(title: str, unique_suffix: str, max_len: int = 100) -> str:
-    """Builds a Sheets tab name from a title, appending a short id so multiple
-    surveys/assignments can safely share one spreadsheet without name clashes.
-    """
+def _clean_tab_title(title: str, max_len: int = 95) -> str:
     cleaned = _FORBIDDEN_TAB_CHARS.sub(" ", title).strip() or "제목 없음"
-    suffix = f" ({unique_suffix[:6]})"
-    return cleaned[: max_len - len(suffix)] + suffix
+    return cleaned[:max_len]
 
 
 def _client():
@@ -96,17 +92,36 @@ def create_spreadsheet(title: str, share_with_email: str | None = None) -> str:
     return sheet_id
 
 
-def ensure_tab_exists(sheet_id: str, tab_name: str) -> None:
-    """Creates the tab if it doesn't already exist in the target spreadsheet."""
+def _existing_tab_titles(sheet_id: str) -> set[str]:
     service = _client()
     meta = (
         service.spreadsheets()
         .get(spreadsheetId=sheet_id, fields="sheets.properties.title")
         .execute()
     )
-    titles = {s["properties"]["title"] for s in meta.get("sheets", [])}
-    if tab_name in titles:
+    return {s["properties"]["title"] for s in meta.get("sheets", [])}
+
+
+def unique_tab_name(sheet_id: str, desired_title: str) -> str:
+    """Picks a clean tab name for a first-time link: the plain title if free,
+    otherwise "제목 (2)", "제목 (3)", ... — only disambiguated when another
+    survey/assignment/roster already used that exact name on this spreadsheet.
+    """
+    cleaned = _clean_tab_title(desired_title)
+    titles = _existing_tab_titles(sheet_id)
+    if cleaned not in titles:
+        return cleaned
+    n = 2
+    while f"{cleaned} ({n})" in titles:
+        n += 1
+    return f"{cleaned} ({n})"
+
+
+def ensure_tab_exists(sheet_id: str, tab_name: str) -> None:
+    """Creates the tab if it doesn't already exist in the target spreadsheet."""
+    if tab_name in _existing_tab_titles(sheet_id):
         return
+    service = _client()
     service.spreadsheets().batchUpdate(
         spreadsheetId=sheet_id,
         body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]},

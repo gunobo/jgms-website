@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,7 +15,9 @@ from app.schemas import (
     StudentCreate,
     StudentOut,
 )
-from app.sheets import extract_spreadsheet_id, is_sheets_configured, make_tab_name, write_rows
+from app.sheets import extract_spreadsheet_id, is_sheets_configured, unique_tab_name, write_rows
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/admin/students", tags=["students"], dependencies=[Depends(require_admin)]
@@ -123,7 +127,7 @@ def link_roster_sheet(body: SheetLinkIn, db: Session = Depends(get_db)):
         roster_sheet = RosterSheet(id="singleton")
         db.add(roster_sheet)
     roster_sheet.sheet_id = sheet_id
-    roster_sheet.sheet_tab = roster_sheet.sheet_tab or make_tab_name("학생 명단", "roster")
+    roster_sheet.sheet_tab = roster_sheet.sheet_tab or unique_tab_name(sheet_id, "학생 명단")
 
     try:
         students = db.query(Student).order_by(Student.name.asc()).all()
@@ -132,9 +136,10 @@ def link_roster_sheet(body: SheetLinkIn, db: Session = Depends(get_db)):
         write_rows(sheet_id, roster_sheet.sheet_tab, rows)
     except Exception as exc:
         db.rollback()
+        logger.exception("Failed to link roster sheet %s", sheet_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요.",
+            detail=f"스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요. ({exc})",
         ) from exc
 
     db.commit()

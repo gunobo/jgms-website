@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,8 +15,10 @@ from app.schemas import (
     SurveyDetail,
     SurveyListItem,
 )
-from app.sheets import append_row, extract_spreadsheet_id, is_sheets_configured, make_tab_name, write_header
+from app.sheets import append_row, extract_spreadsheet_id, is_sheets_configured, unique_tab_name, write_header
 from app.survey_utils import question_to_out, serialize_options, validate_question_input
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/admin/surveys", tags=["admin-surveys"], dependencies=[Depends(require_admin)]
@@ -173,16 +177,17 @@ def link_sheet(survey_id: str, body: SheetLinkIn, db: Session = Depends(get_db))
         )
     survey = _get_survey_or_404(db, survey_id)
     sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
-    sheet_tab = survey.sheet_tab or make_tab_name(survey.title, survey.id)
+    sheet_tab = survey.sheet_tab or unique_tab_name(sheet_id, survey.title)
 
     try:
         write_header(
             sheet_id, sheet_tab, [q.label for q in sorted(survey.questions, key=lambda q: q.order)]
         )
     except Exception as exc:
+        logger.exception("Failed to link survey sheet %s", sheet_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요.",
+            detail=f"스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요. ({exc})",
         ) from exc
 
     survey.sheet_id = sheet_id

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,11 +24,13 @@ from app.sheets import (
     create_spreadsheet,
     extract_spreadsheet_id,
     is_sheets_configured,
-    make_tab_name,
+    unique_tab_name,
     write_header,
     write_rows,
 )
 from app.storage import resolve_upload_path
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/admin/assignments", tags=["admin-assignments"], dependencies=[Depends(require_admin)]
@@ -112,6 +115,7 @@ def create_assignment(
             db.commit()
             db.refresh(assignment)
         except Exception:
+            logger.exception("Failed to auto-create grading sheet for assignment %s", assignment.id)
             db.rollback()
             db.refresh(assignment)
 
@@ -194,8 +198,8 @@ def _rubric_rows(assignment: Assignment) -> list[list[str]]:
 def _write_assignment_sheets(assignment: Assignment, sheet_id: str) -> tuple[str, str]:
     """Writes the rubric table + score header into (new or existing) tabs on
     the given spreadsheet and returns the (rubric_tab, scores_tab) names used."""
-    rubric_tab = assignment.rubric_sheet_tab or make_tab_name(f"{assignment.title} 평가기준표", assignment.id)
-    scores_tab = assignment.scores_sheet_tab or make_tab_name(f"{assignment.title} 점수", assignment.id)
+    rubric_tab = assignment.rubric_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 평가기준표")
+    scores_tab = assignment.scores_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 점수")
 
     write_rows(sheet_id, rubric_tab, _rubric_rows(assignment))
     item_labels = [f"{c.title} - {i.label}" for c, i in all_items(assignment)]
@@ -216,9 +220,10 @@ def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_
     try:
         rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
     except Exception as exc:
+        logger.exception("Failed to link assignment sheet %s", sheet_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요.",
+            detail=f"스프레드시트에 연결할 수 없습니다. 시트를 서비스 계정과 공유했는지 확인해주세요. ({exc})",
         ) from exc
 
     assignment.sheet_id = sheet_id
@@ -361,7 +366,7 @@ def grade_submission(
             grade.synced_to_sheet = True
             db.commit()
         except Exception:
-            pass
+            logger.exception("Failed to sync grade to sheet for submission %s", submission.id)
 
     db.refresh(grade)
     pts = max_score(assignment)

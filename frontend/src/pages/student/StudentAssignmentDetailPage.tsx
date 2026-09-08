@@ -73,19 +73,35 @@ export function StudentAssignmentDetailPage() {
 
       <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-5">
         <h2 className="font-semibold text-gray-900">평가기준표 (만점 {assignment.max_score}점)</h2>
-        {assignment.criteria.map((c) => (
-          <div key={c.id}>
-            <p className="text-sm font-medium text-gray-800">{c.title}</p>
-            {c.description && <p className="text-xs text-gray-500">{c.description}</p>}
-            <ul className="mt-1 space-y-0.5 pl-4 text-sm text-gray-600">
-              {c.items.map((i) => (
-                <li key={i.id} className="list-disc">
-                  {i.label} <span className="text-xs text-gray-400">({i.points}점)</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <div className="overflow-x-auto rounded border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-gray-500">
+              <tr>
+                <th className="px-3 py-2">평가 항목</th>
+                <th className="px-3 py-2">조건</th>
+                <th className="px-3 py-2 text-right">배점</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignment.criteria.flatMap((c) =>
+                c.items.map((item, idx) => (
+                  <tr key={item.id} className="border-t border-gray-100">
+                    {idx === 0 && (
+                      <td className="px-3 py-2 align-top font-medium text-gray-800" rowSpan={c.items.length}>
+                        {c.title}
+                        {c.description && (
+                          <div className="mt-0.5 text-xs font-normal text-gray-400">{c.description}</div>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-3 py-2 text-gray-600">{item.label}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{item.points}점</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {isGraded && mySubmission?.grade && (
@@ -117,11 +133,23 @@ export function StudentAssignmentDetailPage() {
           rows={4}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="w-full text-sm"
-        />
+        <div className="flex items-center gap-3">
+          <label
+            htmlFor="submission-file"
+            className="cursor-pointer rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            파일 선택
+          </label>
+          <input
+            id="submission-file"
+            type="file"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
+          <span className="truncate text-sm text-gray-500">
+            {file ? file.name : "선택된 파일 없음"}
+          </span>
+        </div>
         {mySubmission?.submission?.file_name && !file && (
           <p className="text-xs text-gray-400">현재 첨부: {mySubmission.submission.file_name}</p>
         )}

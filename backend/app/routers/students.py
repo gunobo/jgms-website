@@ -126,14 +126,15 @@ def link_roster_sheet(body: SheetLinkIn, db: Session = Depends(get_db)):
     if not roster_sheet:
         roster_sheet = RosterSheet(id="singleton")
         db.add(roster_sheet)
-    roster_sheet.sheet_id = sheet_id
-    roster_sheet.sheet_tab = roster_sheet.sheet_tab or unique_tab_name(sheet_id, "학생 명단")
 
     try:
+        tab = roster_sheet.sheet_tab or unique_tab_name(sheet_id, "학생 명단")
         students = db.query(Student).order_by(Student.name.asc()).all()
         rows = [["이름", "학번", "이메일", "학년", "반"]]
         rows += [[s.name, s.student_id, s.email, s.grade or "", s.class_name or ""] for s in students]
-        write_rows(sheet_id, roster_sheet.sheet_tab, rows)
+        write_rows(sheet_id, tab, rows)
+        roster_sheet.sheet_id = sheet_id
+        roster_sheet.sheet_tab = tab
     except Exception as exc:
         db.rollback()
         logger.exception("Failed to link roster sheet %s", sheet_id)

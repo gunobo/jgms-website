@@ -177,9 +177,9 @@ def link_sheet(survey_id: str, body: SheetLinkIn, db: Session = Depends(get_db))
         )
     survey = _get_survey_or_404(db, survey_id)
     sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
-    sheet_tab = survey.sheet_tab or unique_tab_name(sheet_id, survey.title)
 
     try:
+        sheet_tab = survey.sheet_tab or unique_tab_name(sheet_id, survey.title)
         write_header(
             sheet_id, sheet_tab, [q.label for q in sorted(survey.questions, key=lambda q: q.order)]
         )

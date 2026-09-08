@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.assignment_utils import all_items, criterion_to_out, max_score
 from app.auth import CurrentUser, require_admin
 from app.database import get_db
-from app.models import Assignment, Grade, RubricCriterion, RubricItem, Submission
+from app.models import Assignment, Grade, RosterSheet, RubricCriterion, RubricItem, Submission
 from app.schemas import (
     AssignmentCreateIn,
     AssignmentDetail,
@@ -103,11 +103,19 @@ def create_assignment(
     db.commit()
     db.refresh(assignment)
 
-    # Best-effort: auto-create and share a grading spreadsheet so the admin
-    # doesn't have to make one by hand. Never blocks assignment creation.
+    # Best-effort: automatically link a grading spreadsheet so the admin
+    # doesn't have to do it by hand. Reuses the roster's spreadsheet (the
+    # club's "main" sheet) if one is linked — new tabs for this assignment's
+    # rubric/scores get added there. Falls back to creating a brand new,
+    # dedicated spreadsheet only if no roster sheet exists yet. Never blocks
+    # assignment creation.
     if is_sheets_configured():
         try:
-            sheet_id = create_spreadsheet(f"{assignment.title} - 채점표", share_with_email=user.email)
+            roster_sheet = db.get(RosterSheet, "singleton")
+            if roster_sheet and roster_sheet.sheet_id:
+                sheet_id = roster_sheet.sheet_id
+            else:
+                sheet_id = create_spreadsheet(f"{assignment.title} - 채점표", share_with_email=user.email)
             rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
             assignment.sheet_id = sheet_id
             assignment.rubric_sheet_tab = rubric_tab
@@ -115,7 +123,7 @@ def create_assignment(
             db.commit()
             db.refresh(assignment)
         except Exception:
-            logger.exception("Failed to auto-create grading sheet for assignment %s", assignment.id)
+            logger.exception("Failed to auto-link grading sheet for assignment %s", assignment.id)
             db.rollback()
             db.refresh(assignment)
 

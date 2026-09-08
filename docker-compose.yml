@@ -52,11 +52,13 @@ services:
   frontend:
     build:
       context: ./frontend
-      # VITE_API_URL is compiled into the built JS, so it must be passed at
-      # build time. Changing it in .env requires `docker compose up -d --build
+      # These are compiled into the built JS, so they must be passed at build
+      # time (not read from frontend/.env, which isn't copied into the image).
+      # Changing either in .env requires `docker compose up -d --build
       # frontend`, not just a restart.
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     mem_limit: 150m
     ports:

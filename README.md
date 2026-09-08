@@ -27,6 +27,7 @@
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
+cp .env.example .env
 ```
 
 `backend/.env`에서 최소한 다음 값을 채워주세요 (자세한 설정 방법은 2번 섹션 참고):
@@ -35,9 +36,7 @@ cp frontend/.env.example frontend/.env
 - `GOOGLE_CLIENT_ID` — 구글 OAuth 클라이언트 ID
 - `ADMIN_EMAILS` — 최초 관리자로 등록할 학교 구글 이메일 (콤마로 구분)
 
-`frontend/.env`:
-
-- `VITE_GOOGLE_CLIENT_ID` — `backend/.env`의 `GOOGLE_CLIENT_ID`와 동일한 값
+루트 `.env`의 `VITE_GOOGLE_CLIENT_ID` — 위 `GOOGLE_CLIENT_ID`와 동일한 값. 프론트가 빌드 시점에 이 값을 JS에 박아 넣기 때문에 **`frontend/.env`가 아니라 루트 `.env`** 에 넣어야 실제로 반영됩니다 (`frontend/.env`는 Docker 없이 직접 `npm run dev`로 띄울 때만 쓰임).
 
 ### 실행
 
@@ -74,7 +73,8 @@ docker compose down -v       # 데이터까지 완전 삭제
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
    - Application type: **Web application**
    - Authorized JavaScript origins에 사이트 주소 추가 (로컬 개발: `http://localhost:5174`, 배포 시: 실제 도메인)
-   - 생성된 **Client ID**를 `backend/.env`의 `GOOGLE_CLIENT_ID`와 `frontend/.env`의 `VITE_GOOGLE_CLIENT_ID`에 넣기 (Client Secret은 사용하지 않습니다 — ID 토큰 방식이라 필요 없음)
+   - 생성된 **Client ID**를 `backend/.env`의 `GOOGLE_CLIENT_ID`와 루트 `.env`의 `VITE_GOOGLE_CLIENT_ID`에 넣기 (Client Secret은 사용하지 않습니다 — ID 토큰 방식이라 필요 없음)
+   - OAuth consent screen이 "테스트" 상태면 등록한 테스트 사용자만 로그인 가능합니다. 여러 명이 로그인해야 하면 **PUBLISH APP**으로 게시하세요 (민감하지 않은 스코프만 써서 별도 심사 없이 바로 게시됩니다).
 
 ### 2-2. 구글 시트 연동용 서비스 계정 (선택)
 
@@ -135,8 +135,8 @@ cp .env.example .env
 ```
 
 - `backend/.env`: 로컬 개발과 동일하게 `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `ADMIN_EMAILS`, (선택) 구글 시트 서비스 계정 값을 채웁니다. `GOOGLE_WORKSPACE_HD`로 학교 도메인 제한을 걸어두는 것을 권장합니다.
-- `frontend/.env`: `VITE_GOOGLE_CLIENT_ID`를 채웁니다 (`VITE_API_URL`은 루트 `.env`가 덮어쓰므로 그대로 둬도 됨).
-- 루트 `.env`: MySQL 비밀번호(`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`)를 실제 값으로 바꾸고, `FRONTEND_ORIGIN`/`VITE_API_URL`은 기본값(`https://jgms.imjemin.co.kr`, `https://jgms-api.imjemin.co.kr`)을 그대로 쓰면 됩니다. `CLOUDFLARE_TUNNEL_TOKEN`은 4-4에서 발급받아 채웁니다.
+- `frontend/.env`: 안 건드려도 됩니다 (아래 루트 `.env`가 빌드 시점에 덮어씀).
+- 루트 `.env`: MySQL 비밀번호(`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`)를 실제 값으로 바꾸고, `VITE_GOOGLE_CLIENT_ID`에 `GOOGLE_CLIENT_ID`와 같은 값을 넣습니다. `FRONTEND_ORIGIN`/`VITE_API_URL`은 기본값(`https://jgms.imjemin.co.kr`, `https://jgms-api.imjemin.co.kr`)을 그대로 쓰면 됩니다. `CLOUDFLARE_TUNNEL_TOKEN`은 4-4에서 발급받아 채웁니다.
 - Google Cloud Console의 OAuth 클라이언트 **Authorized JavaScript origins**에 `https://jgms.imjemin.co.kr`을 추가해야 로그인이 됩니다.
 
 ### 4-3. 빌드 및 실행

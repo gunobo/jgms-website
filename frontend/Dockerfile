@@ -6,7 +6,9 @@ COPY . .
 # Baked into the built JS at build time (not read at container start), so
 # this must be passed as a build arg — see docker-compose.yml's build.args.
 ARG VITE_API_URL=""
+ARG VITE_GOOGLE_CLIENT_ID=""
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 # `npm run build` also runs `tsc -b` (full type-check) first, which is far
 # heavier than the actual bundling step and not needed to produce working
 # output — type errors are already caught during development. Skip it here

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.assignment_utils import all_items, criterion_to_out, max_score
 from app.auth import CurrentUser, require_admin
 from app.database import get_db
-from app.models import Assignment, Grade, RosterSheet, RubricCriterion, RubricItem, Submission
+from app.models import Assignment, Grade, RosterSheet, RubricCriterion, RubricItem, Student, Submission
 from app.schemas import (
     AssignmentCreateIn,
     AssignmentDetail,
@@ -20,12 +20,11 @@ from app.schemas import (
     SubmissionWithGradeOut,
 )
 from app.sheets import (
-    append_row,
     create_spreadsheet,
     extract_spreadsheet_id,
     is_sheets_configured,
     unique_tab_name,
-    write_header,
+    write_rows,
 )
 from app.storage import resolve_upload_path
 
@@ -34,6 +33,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/admin/assignments", tags=["admin-assignments"], dependencies=[Depends(require_admin)]
 )
+
+
+def _to_naive_utc(dt: datetime | None) -> datetime | None:
+    """Normalizes an incoming (possibly timezone-aware) datetime to naive UTC,
+    matching the naive-UTC convention used everywhere else in this app."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def _get_assignment_or_404(db: Session, assignment_id: str) -> Assignment:
@@ -54,6 +63,7 @@ def _to_detail(a: Assignment) -> AssignmentDetail:
         title=a.title,
         description=a.description,
         is_published=a.is_published,
+        due_at=a.due_at,
         sheet_id=a.sheet_id,
         rubric_sheet_tab=a.rubric_sheet_tab,
         scores_sheet_tab=a.scores_sheet_tab,
@@ -80,6 +90,7 @@ def list_assignments(db: Session = Depends(get_db)):
                 title=a.title,
                 description=a.description,
                 is_published=a.is_published,
+                due_at=a.due_at,
                 created_at=a.created_at,
                 max_score=max_score(a),
                 submission_count=count,
@@ -92,7 +103,12 @@ def list_assignments(db: Session = Depends(get_db)):
 def create_assignment(
     body: AssignmentCreateIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_admin)
 ):
-    assignment = Assignment(title=body.title, description=body.description, created_by_id=user.user_id)
+    assignment = Assignment(
+        title=body.title,
+        description=body.description,
+        due_at=_to_naive_utc(body.due_at),
+        created_by_id=user.user_id,
+    )
     for ci, c in enumerate(body.criteria):
         criterion = RubricCriterion(title=c.title, description=c.description, order=ci)
         for ii, item in enumerate(c.items):
@@ -115,7 +131,7 @@ def create_assignment(
                 sheet_id = roster_sheet.sheet_id
             else:
                 sheet_id = create_spreadsheet(f"{assignment.title} - 채점표", share_with_email=user.email)
-            scores_tab = _write_assignment_sheets(assignment, sheet_id)
+            scores_tab = _write_score_sheet(db, assignment, sheet_id)
             assignment.sheet_id = sheet_id
             assignment.scores_sheet_tab = scores_tab
             db.commit()
@@ -138,6 +154,7 @@ def update_assignment(assignment_id: str, body: AssignmentCreateIn, db: Session 
     assignment = _get_assignment_or_404(db, assignment_id)
     assignment.title = body.title
     assignment.description = body.description
+    assignment.due_at = _to_naive_utc(body.due_at)
 
     existing_criteria = {c.id: c for c in assignment.criteria}
     incoming_criterion_ids = {c.id for c in body.criteria if c.id}
@@ -192,14 +209,42 @@ def set_published(assignment_id: str, published: bool, db: Session = Depends(get
     return _to_detail(assignment)
 
 
-def _write_assignment_sheets(assignment: Assignment, sheet_id: str) -> str:
-    """Writes the score header into a (new or existing) tab on the given
-    spreadsheet and returns the scores_tab name used. Does not create a
-    separate rubric-table tab — only the score sheet."""
+def _write_score_sheet(db: Session, assignment: Assignment, sheet_id: str) -> str:
+    """Overwrites the score tab with one row per student in the roster (not
+    just those graded so far), keyed by student — so grading or re-grading
+    someone updates their row in place instead of appending a duplicate."""
     scores_tab = assignment.scores_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 점수")
 
-    item_labels = [f"{c.title} - {i.label}" for c, i in all_items(assignment)]
-    write_header(sheet_id, scores_tab, [*item_labels, "총점", "코멘트"])
+    items = all_items(assignment)
+    item_labels = [f"{c.title} - {i.label}" for c, i in items]
+    header = ["이름", "학번", *item_labels, "총점", "코멘트", "채점 시각"]
+
+    students = db.query(Student).order_by(Student.name.asc()).all()
+    submissions = (
+        db.query(Submission)
+        .options(selectinload(Submission.grade))
+        .filter(Submission.assignment_id == assignment.id)
+        .all()
+    )
+    grade_by_student_id = {s.student_id: s.grade for s in submissions if s.grade}
+
+    rows = [header]
+    for student in students:
+        grade = grade_by_student_id.get(student.id)
+        if grade:
+            checked = set(grade.checked_item_ids or [])
+            row = [student.name, student.student_id]
+            row += ["O" if item.id in checked else "" for _, item in items]
+            row += [
+                str(grade.total_score),
+                grade.comment or "",
+                grade.graded_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+        else:
+            row = [student.name, student.student_id, *([""] * (len(items) + 3))]
+        rows.append(row)
+
+    write_rows(sheet_id, scores_tab, rows)
     return scores_tab
 
 
@@ -214,7 +259,7 @@ def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_
     sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
 
     try:
-        scores_tab = _write_assignment_sheets(assignment, sheet_id)
+        scores_tab = _write_score_sheet(db, assignment, sheet_id)
     except Exception as exc:
         logger.exception("Failed to link assignment sheet %s", sheet_id)
         raise HTTPException(
@@ -347,17 +392,7 @@ def grade_submission(
 
     if assignment.sheet_id:
         try:
-            checked_set = set(checked_ids)
-            row = [
-                grade.graded_at.strftime("%Y-%m-%d %H:%M:%S"),
-                submission.student.name,
-                submission.student.student_id,
-            ]
-            for _, item in all_items(assignment):
-                row.append("O" if item.id in checked_set else "")
-            row.append(str(total))
-            row.append(body.comment or "")
-            append_row(assignment.sheet_id, assignment.scores_sheet_tab or "점수", row)
+            _write_score_sheet(db, assignment, assignment.sheet_id)
             grade.synced_to_sheet = True
             db.commit()
         except Exception:

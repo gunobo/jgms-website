@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError, api } from "../../api/client";
 import type { AssignmentDetail, MySubmissionOut } from "../../api/types";
+import { parseUtc } from "../../lib/datetime";
 
 export function StudentAssignmentDetailPage() {
   const { id } = useParams();
@@ -38,9 +39,14 @@ export function StudentAssignmentDetailPage() {
   if (!assignment) return <p className="text-red-600">{error}</p>;
 
   const isGraded = Boolean(mySubmission?.grade);
+  const isPastDue = assignment.due_at ? parseUtc(assignment.due_at).getTime() < Date.now() : false;
 
   const submit = async () => {
     setError(null);
+    if (isPastDue) {
+      setError("마감된 과제는 제출할 수 없습니다.");
+      return;
+    }
     if (!linkUrl.trim() && !text.trim() && !file) {
       setError("링크, 텍스트, 파일 중 최소 하나는 입력해주세요.");
       return;
@@ -68,6 +74,12 @@ export function StudentAssignmentDetailPage() {
         <h1 className="text-lg font-bold text-gray-900">{assignment.title}</h1>
         {assignment.description && (
           <p className="mt-2 whitespace-pre-wrap text-sm text-gray-500">{assignment.description}</p>
+        )}
+        {assignment.due_at && (
+          <p className={`mt-2 text-sm ${isPastDue ? "font-medium text-red-500" : "text-gray-500"}`}>
+            마감: {parseUtc(assignment.due_at).toLocaleString("ko-KR")}
+            {isPastDue && " (마감됨)"}
+          </p>
         )}
       </div>
 
@@ -120,23 +132,34 @@ export function StudentAssignmentDetailPage() {
           {mySubmission?.submission ? "제출물 수정" : "과제 제출"}
         </h2>
         {error && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        {isPastDue && (
+          <p className="rounded bg-red-50 p-2 text-sm text-red-600">
+            마감일이 지나 더 이상 제출할 수 없습니다.
+          </p>
+        )}
         <input
           placeholder="링크 (예: GitHub 저장소, 배포 URL)"
           value={linkUrl}
           onChange={(e) => setLinkUrl(e.target.value)}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          disabled={isPastDue}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
         />
         <textarea
           placeholder="텍스트 답안 (선택)"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          disabled={isPastDue}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
         />
         <div className="flex items-center gap-3">
           <label
             htmlFor="submission-file"
-            className="cursor-pointer rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className={`rounded border border-gray-300 px-4 py-2 text-sm font-medium ${
+              isPastDue
+                ? "cursor-not-allowed text-gray-400"
+                : "cursor-pointer text-gray-700 hover:bg-gray-50"
+            }`}
           >
             파일 선택
           </label>
@@ -144,6 +167,7 @@ export function StudentAssignmentDetailPage() {
             id="submission-file"
             type="file"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            disabled={isPastDue}
             className="hidden"
           />
           <span className="truncate text-sm text-gray-500">
@@ -155,7 +179,7 @@ export function StudentAssignmentDetailPage() {
         )}
         <button
           onClick={submit}
-          disabled={submitting}
+          disabled={submitting || isPastDue}
           className="w-full rounded bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {submitting ? "제출 중..." : mySubmission?.submission ? "다시 제출" : "제출하기"}

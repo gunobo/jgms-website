@@ -133,6 +133,7 @@ class Assignment(Base):
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sheet_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     rubric_sheet_tab: Mapped[str | None] = mapped_column(String(100), nullable=True)
     scores_sheet_tab: Mapped[str | None] = mapped_column(String(100), nullable=True)

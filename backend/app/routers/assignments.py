@@ -40,6 +40,7 @@ def list_assignments(db: Session = Depends(get_db), user: CurrentUser = Depends(
                 title=a.title,
                 description=a.description,
                 is_published=a.is_published,
+                due_at=a.due_at,
                 created_at=a.created_at,
                 max_score=max_score(a),
                 already_submitted=submission is not None,
@@ -65,6 +66,7 @@ def get_assignment(
         title=assignment.title,
         description=assignment.description,
         is_published=assignment.is_published,
+        due_at=assignment.due_at,
         sheet_id=None,
         rubric_sheet_tab=None,
         scores_sheet_tab=None,
@@ -132,6 +134,10 @@ async def submit_assignment(
     )
     if not assignment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="과제를 찾을 수 없습니다.")
+    if assignment.due_at and datetime.utcnow() > assignment.due_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="마감된 과제는 제출할 수 없습니다."
+        )
 
     link_url = (link_url or "").strip() or None
     text_content = (text_content or "").strip() or None

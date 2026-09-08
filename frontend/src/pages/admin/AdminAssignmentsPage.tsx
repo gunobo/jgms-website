@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { AssignmentListItem } from "../../api/types";
+import { parseUtc } from "../../lib/datetime";
 
 export function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentListItem[]>([]);
@@ -64,6 +65,7 @@ export function AdminAssignmentsPage() {
                 {a.description && <p className="mt-1 text-sm text-gray-500">{a.description}</p>}
                 <p className="mt-2 text-xs text-gray-400">
                   제출 {a.submission_count}건 · 만점 {a.max_score}점
+                  {a.due_at && ` · 마감 ${parseUtc(a.due_at).toLocaleString("ko-KR")}`}
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 text-sm">

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../../api/client";
 import type { AssignmentDetail, RubricCriterionInput } from "../../api/types";
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from "../../lib/datetime";
 
 let tempIdCounter = 0;
 function tempId() {
@@ -25,6 +26,7 @@ export function AdminAssignmentBuilderPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [dueAt, setDueAt] = useState("");
   const [criteria, setCriteria] = useState<RubricCriterionInput[]>([blankCriterion(0)]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -37,6 +39,7 @@ export function AdminAssignmentBuilderPage() {
       .then((a) => {
         setTitle(a.title);
         setDescription(a.description ?? "");
+        setDueAt(a.due_at ? toDatetimeLocalValue(a.due_at) : "");
         setCriteria(a.criteria.length > 0 ? a.criteria : [blankCriterion(0)]);
       })
       .catch(() => setError("과제를 불러오지 못했습니다."))
@@ -99,6 +102,7 @@ export function AdminAssignmentBuilderPage() {
     const payload = {
       title,
       description: description || null,
+      due_at: dueAt ? fromDatetimeLocalValue(dueAt) : null,
       criteria: criteria.map((c, ci) => ({
         id: c.id?.startsWith("temp-") ? undefined : c.id,
         title: c.title,
@@ -149,6 +153,23 @@ export function AdminAssignmentBuilderPage() {
           rows={3}
           className="w-full text-sm text-gray-600 focus:outline-none"
         />
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">마감일 (선택)</label>
+          <input
+            type="datetime-local"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          {dueAt && (
+            <button
+              onClick={() => setDueAt("")}
+              className="text-xs text-gray-400 hover:text-red-500"
+            >
+              지우기
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between">

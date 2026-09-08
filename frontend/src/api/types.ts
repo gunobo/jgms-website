@@ -124,6 +124,7 @@ export interface AssignmentListItem {
   title: string;
   description: string | null;
   is_published: boolean;
+  due_at: string | null;
   created_at: string;
   max_score: number;
   submission_count: number;
@@ -136,6 +137,7 @@ export interface AssignmentDetail {
   title: string;
   description: string | null;
   is_published: boolean;
+  due_at: string | null;
   sheet_id: string | null;
   rubric_sheet_tab: string | null;
   scores_sheet_tab: string | null;

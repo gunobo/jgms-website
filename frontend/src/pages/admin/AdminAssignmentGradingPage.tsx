@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ApiError, api } from "../../api/client";
 import type { AssignmentDetail, SubmissionWithGradeOut } from "../../api/types";
 import { SheetLinkPanel } from "../../components/SheetLinkPanel";
+import { parseUtc } from "../../lib/datetime";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8001";
 
@@ -188,7 +189,7 @@ export function AdminAssignmentGradingPage() {
                   {s.student_name} ({s.student_number})
                 </p>
                 <p className="text-xs text-gray-400">
-                  {new Date(s.submission.submitted_at).toLocaleString("ko-KR")}
+                  {parseUtc(s.submission.submitted_at).toLocaleString("ko-KR")}
                 </p>
               </div>
               <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { ResponseOut, SurveyDetail } from "../../api/types";
 import { SheetLinkPanel } from "../../components/SheetLinkPanel";
+import { parseUtc } from "../../lib/datetime";
 
 export function AdminSurveyResponsesPage() {
   const { id } = useParams();
@@ -77,7 +78,7 @@ export function AdminSurveyResponsesPage() {
             {responses.map((r) => (
               <tr key={r.id} className="border-t border-gray-100">
                 <td className="whitespace-nowrap px-4 py-2 text-gray-500">
-                  {new Date(r.submitted_at).toLocaleString("ko-KR")}
+                  {parseUtc(r.submitted_at).toLocaleString("ko-KR")}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2">{r.student_name}</td>
                 <td className="whitespace-nowrap px-4 py-2">{r.student_number}</td>

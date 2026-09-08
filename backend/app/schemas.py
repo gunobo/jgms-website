@@ -222,6 +222,7 @@ class RubricCriterionIn(BaseModel):
 class AssignmentCreateIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
+    due_at: datetime | None = None
     criteria: list[RubricCriterionIn] = Field(min_length=1)
 
 
@@ -242,6 +243,7 @@ class AssignmentListItem(BaseModel):
     title: str
     description: str | None
     is_published: bool
+    due_at: datetime | None
     created_at: datetime
     max_score: int
     submission_count: int = 0
@@ -254,6 +256,7 @@ class AssignmentDetail(BaseModel):
     title: str
     description: str | None
     is_published: bool
+    due_at: datetime | None
     sheet_id: str | None
     rubric_sheet_tab: str | None
     scores_sheet_tab: str | None

@@ -26,7 +26,6 @@ from app.sheets import (
     is_sheets_configured,
     unique_tab_name,
     write_header,
-    write_rows,
 )
 from app.storage import resolve_upload_path
 
@@ -116,9 +115,8 @@ def create_assignment(
                 sheet_id = roster_sheet.sheet_id
             else:
                 sheet_id = create_spreadsheet(f"{assignment.title} - 채점표", share_with_email=user.email)
-            rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
+            scores_tab = _write_assignment_sheets(assignment, sheet_id)
             assignment.sheet_id = sheet_id
-            assignment.rubric_sheet_tab = rubric_tab
             assignment.scores_sheet_tab = scores_tab
             db.commit()
             db.refresh(assignment)
@@ -194,25 +192,15 @@ def set_published(assignment_id: str, published: bool, db: Session = Depends(get
     return _to_detail(assignment)
 
 
-def _rubric_rows(assignment: Assignment) -> list[list[str]]:
-    rows = [["평가 항목", "조건", "배점"]]
-    for c in sorted(assignment.criteria, key=lambda c: c.order):
-        for i in sorted(c.items, key=lambda i: i.order):
-            rows.append([c.title, i.label, str(i.points)])
-    rows.append(["", "총점", str(max_score(assignment))])
-    return rows
-
-
-def _write_assignment_sheets(assignment: Assignment, sheet_id: str) -> tuple[str, str]:
-    """Writes the rubric table + score header into (new or existing) tabs on
-    the given spreadsheet and returns the (rubric_tab, scores_tab) names used."""
-    rubric_tab = assignment.rubric_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 평가기준표")
+def _write_assignment_sheets(assignment: Assignment, sheet_id: str) -> str:
+    """Writes the score header into a (new or existing) tab on the given
+    spreadsheet and returns the scores_tab name used. Does not create a
+    separate rubric-table tab — only the score sheet."""
     scores_tab = assignment.scores_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 점수")
 
-    write_rows(sheet_id, rubric_tab, _rubric_rows(assignment))
     item_labels = [f"{c.title} - {i.label}" for c, i in all_items(assignment)]
     write_header(sheet_id, scores_tab, [*item_labels, "총점", "코멘트"])
-    return rubric_tab, scores_tab
+    return scores_tab
 
 
 @router.post("/{assignment_id}/sheet", response_model=AssignmentDetail)
@@ -226,7 +214,7 @@ def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_
     sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
 
     try:
-        rubric_tab, scores_tab = _write_assignment_sheets(assignment, sheet_id)
+        scores_tab = _write_assignment_sheets(assignment, sheet_id)
     except Exception as exc:
         logger.exception("Failed to link assignment sheet %s", sheet_id)
         raise HTTPException(
@@ -235,7 +223,6 @@ def link_sheet(assignment_id: str, body: SheetLinkIn, db: Session = Depends(get_
         ) from exc
 
     assignment.sheet_id = sheet_id
-    assignment.rubric_sheet_tab = rubric_tab
     assignment.scores_sheet_tab = scores_tab
     db.commit()
     db.refresh(assignment)

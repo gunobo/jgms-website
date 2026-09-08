@@ -219,7 +219,7 @@ def _write_score_sheet(db: Session, assignment: Assignment, sheet_id: str) -> st
     item_labels = [f"{c.title} - {i.label}" for c, i in items]
     header = ["이름", "학번", *item_labels, "총점", "코멘트", "채점 시각"]
 
-    students = db.query(Student).order_by(Student.name.asc()).all()
+    students = db.query(Student).order_by(Student.student_id.asc()).all()
     submissions = (
         db.query(Submission)
         .options(selectinload(Submission.grade))

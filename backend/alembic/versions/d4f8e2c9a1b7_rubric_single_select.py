@@ -21,10 +21,14 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     with op.batch_alter_table('grades') as batch_op:
-        batch_op.alter_column('checked_item_ids', new_column_name='selected_item_ids')
+        batch_op.alter_column(
+            'checked_item_ids', new_column_name='selected_item_ids', existing_type=sa.JSON()
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table('grades') as batch_op:
-        batch_op.alter_column('selected_item_ids', new_column_name='checked_item_ids')
+        batch_op.alter_column(
+            'selected_item_ids', new_column_name='checked_item_ids', existing_type=sa.JSON()
+        )

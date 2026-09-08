@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { Student } from "../../api/types";
 import { SheetLinkPanel } from "../../components/SheetLinkPanel";
+import { SheetImportPanel } from "../../components/SheetImportPanel";
 
 export function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -89,6 +90,8 @@ export function AdminStudentsPage() {
           load();
         }}
       />
+
+      <SheetImportPanel onImported={load} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <form onSubmit={addStudent} className="space-y-3 rounded-lg border border-gray-200 bg-white p-5">

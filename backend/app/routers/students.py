@@ -10,12 +10,21 @@ from app.models import RosterSheet, Student
 from app.schemas import (
     RosterSheetOut,
     SheetLinkIn,
+    SheetPreviewIn,
+    SheetPreviewOut,
     StudentBulkCreate,
     StudentBulkResult,
     StudentCreate,
+    StudentImportIn,
     StudentOut,
 )
-from app.sheets import extract_spreadsheet_id, is_sheets_configured, unique_tab_name, write_rows
+from app.sheets import (
+    extract_spreadsheet_id,
+    get_range_values,
+    is_sheets_configured,
+    unique_tab_name,
+    write_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +101,57 @@ def create_students_bulk(body: StudentBulkCreate, db: Session = Depends(get_db))
         except IntegrityError:
             db.rollback()
             skipped.append(line)
+
+    if created:
+        _sync_roster_sheet(db)
+    return StudentBulkResult(created=created, skipped=skipped)
+
+
+@router.post("/sheet-preview", response_model=SheetPreviewOut)
+def preview_sheet(body: SheetPreviewIn):
+    if not is_sheets_configured():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="서버에 Google Sheets 서비스 계정이 설정되어 있지 않습니다.",
+        )
+    sheet_id = extract_spreadsheet_id(body.sheet_url_or_id)
+    try:
+        rows = get_range_values(sheet_id, body.range)
+    except Exception as exc:
+        logger.exception("Failed to preview sheet %s range %s", sheet_id, body.range)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"시트를 읽을 수 없습니다. 시트를 서비스 계정과 공유했는지, 범위가 맞는지 확인해주세요. ({exc})",
+        ) from exc
+    return SheetPreviewOut(rows=rows)
+
+
+@router.post("/import", response_model=StudentBulkResult)
+def import_students(body: StudentImportIn, db: Session = Depends(get_db)):
+    created = 0
+    skipped: list[str] = []
+
+    for row in body.students:
+        try:
+            data = StudentCreate(
+                name=row.name,
+                student_id=row.student_id,
+                email=row.email,
+                grade=row.grade or None,
+                class_name=row.class_name or None,
+            )
+        except Exception:
+            skipped.append(f"{row.name},{row.student_id},{row.email}")
+            continue
+
+        student = Student(**data.model_dump())
+        db.add(student)
+        try:
+            db.commit()
+            created += 1
+        except IntegrityError:
+            db.rollback()
+            skipped.append(f"{row.name},{row.student_id},{row.email}")
 
     if created:
         _sync_roster_sheet(db)

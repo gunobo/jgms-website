@@ -128,6 +128,18 @@ def ensure_tab_exists(sheet_id: str, tab_name: str) -> None:
     ).execute()
 
 
+def get_range_values(sheet_id: str, range_: str) -> list[list[str]]:
+    """Reads raw cell values for a range (e.g. "A2:E100" or "Sheet1!A2:E100")."""
+    service = _client()
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(spreadsheetId=sheet_id, range=range_)
+        .execute()
+    )
+    return result.get("values", [])
+
+
 def write_header(sheet_id: str, sheet_tab: str, headers: list[str]) -> None:
     """Writes the header row (question/item labels) for a linked sheet tab."""
     ensure_tab_exists(sheet_id, sheet_tab)

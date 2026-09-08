@@ -51,6 +51,27 @@ class StudentBulkResult(BaseModel):
     skipped: list[str]
 
 
+class SheetPreviewIn(BaseModel):
+    sheet_url_or_id: str = Field(min_length=1)
+    range: str = Field(min_length=1, description='e.g. "A2:E100" or "Sheet1!A2:E100"')
+
+
+class SheetPreviewOut(BaseModel):
+    rows: list[list[str]]
+
+
+class StudentImportRow(BaseModel):
+    name: str
+    student_id: str
+    email: str
+    grade: str | None = None
+    class_name: str | None = None
+
+
+class StudentImportIn(BaseModel):
+    students: list[StudentImportRow]
+
+
 # --- Admins ---
 
 

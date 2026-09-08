@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from app.assignment_utils import all_items, criterion_to_out, max_score
+from app.assignment_utils import criterion_to_out, max_score, resolve_selection, selected_item_by_criterion
 from app.auth import CurrentUser, require_admin
 from app.database import get_db
 from app.models import Assignment, Grade, RosterSheet, RubricCriterion, RubricItem, Student, Submission
@@ -215,9 +215,8 @@ def _write_score_sheet(db: Session, assignment: Assignment, sheet_id: str) -> st
     someone updates their row in place instead of appending a duplicate."""
     scores_tab = assignment.scores_sheet_tab or unique_tab_name(sheet_id, f"{assignment.title} 점수")
 
-    items = all_items(assignment)
-    item_labels = [f"{c.title} - {i.label}" for c, i in items]
-    header = ["이름", "학번", *item_labels, "총점", "코멘트", "채점 시각"]
+    criteria = sorted(assignment.criteria, key=lambda c: c.order)
+    header = ["이름", "학번", *[c.title for c in criteria], "총점", "코멘트", "채점 시각"]
 
     students = db.query(Student).order_by(Student.student_id.asc()).all()
     submissions = (
@@ -232,16 +231,18 @@ def _write_score_sheet(db: Session, assignment: Assignment, sheet_id: str) -> st
     for student in students:
         grade = grade_by_student_id.get(student.id)
         if grade:
-            checked = set(grade.checked_item_ids or [])
+            chosen_by_criterion = selected_item_by_criterion(assignment, grade.selected_item_ids or [])
             row = [student.name, student.student_id]
-            row += ["O" if item.id in checked else "" for _, item in items]
+            for c in criteria:
+                item = chosen_by_criterion.get(c.id)
+                row.append(f"{item.label} ({item.points}점)" if item else "")
             row += [
                 str(grade.total_score),
                 grade.comment or "",
                 grade.graded_at.strftime("%Y-%m-%d %H:%M:%S"),
             ]
         else:
-            row = [student.name, student.student_id, *([""] * (len(items) + 3))]
+            row = [student.name, student.student_id, *([""] * (len(criteria) + 3))]
         rows.append(row)
 
     write_rows(sheet_id, scores_tab, rows)
@@ -299,7 +300,7 @@ def _grade_to_out(g: Grade | None, max_pts: int) -> GradeOut | None:
         return None
     return GradeOut(
         id=g.id,
-        checked_item_ids=g.checked_item_ids or [],
+        selected_item_ids=g.selected_item_ids or [],
         total_score=g.total_score,
         max_score=max_pts,
         comment=g.comment,
@@ -366,13 +367,11 @@ def grade_submission(
     if not submission:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="제출물을 찾을 수 없습니다.")
 
-    valid_item_ids = {i.id: i for _, i in all_items(assignment)}
-    checked_ids = [iid for iid in body.checked_item_ids if iid in valid_item_ids]
-    total = sum(valid_item_ids[iid].points for iid in checked_ids)
+    resolved_ids, total = resolve_selection(assignment, body.selected_item_ids)
 
     if submission.grade:
         grade = submission.grade
-        grade.checked_item_ids = checked_ids
+        grade.selected_item_ids = resolved_ids
         grade.total_score = total
         grade.comment = body.comment
         grade.graded_at = datetime.utcnow()
@@ -381,7 +380,7 @@ def grade_submission(
     else:
         grade = Grade(
             submission_id=submission.id,
-            checked_item_ids=checked_ids,
+            selected_item_ids=resolved_ids,
             total_score=total,
             comment=body.comment,
             graded_by_id=user.user_id,

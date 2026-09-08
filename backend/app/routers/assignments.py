@@ -97,7 +97,7 @@ def get_my_submission(
         g = submission.grade
         grade_out = GradeOut(
             id=g.id,
-            checked_item_ids=g.checked_item_ids or [],
+            selected_item_ids=g.selected_item_ids or [],
             total_score=g.total_score,
             max_score=pts,
             comment=g.comment,

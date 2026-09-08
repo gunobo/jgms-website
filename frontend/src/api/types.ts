@@ -157,7 +157,7 @@ export interface SubmissionOut {
 
 export interface GradeOut {
   id: string;
-  checked_item_ids: string[];
+  selected_item_ids: string[];
   total_score: number;
   max_score: number;
   comment: string | null;

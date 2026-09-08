@@ -209,7 +209,7 @@ class Grade(Base):
     __tablename__ = "grades"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    checked_item_ids: Mapped[list] = mapped_column(JSON, default=list)
+    selected_item_ids: Mapped[list] = mapped_column(JSON, default=list)
     total_score: Mapped[int] = mapped_column(Integer, default=0)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     graded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

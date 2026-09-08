@@ -276,7 +276,7 @@ class SubmissionOut(BaseModel):
 
 class GradeOut(BaseModel):
     id: str
-    checked_item_ids: list[str]
+    selected_item_ids: list[str]
     total_score: int
     max_score: int
     comment: str | None
@@ -297,5 +297,5 @@ class MySubmissionOut(BaseModel):
 
 
 class GradeIn(BaseModel):
-    checked_item_ids: list[str] = Field(default_factory=list)
+    selected_item_ids: list[str] = Field(default_factory=list)
     comment: str | None = Field(default=None, max_length=2000)

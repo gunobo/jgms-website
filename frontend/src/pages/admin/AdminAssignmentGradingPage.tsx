@@ -16,23 +16,24 @@ function GradingPanel({
   item: SubmissionWithGradeOut;
   onSaved: () => void;
 }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set(item.grade?.checked_item_ids ?? []));
+  const initialSelection: Record<string, string> = {};
+  for (const c of assignment.criteria) {
+    const chosen = c.items.find((i) => item.grade?.selected_item_ids.includes(i.id));
+    if (chosen) initialSelection[c.id] = chosen.id;
+  }
+  const [selected, setSelected] = useState<Record<string, string>>(initialSelection);
   const [comment, setComment] = useState(item.grade?.comment ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const total = assignment.criteria.reduce(
-    (sum, c) => sum + c.items.reduce((s, i) => s + (checked.has(i.id) ? i.points : 0), 0),
-    0
-  );
+  const total = assignment.criteria.reduce((sum, c) => {
+    const chosenId = selected[c.id];
+    const chosenItem = c.items.find((i) => i.id === chosenId);
+    return sum + (chosenItem?.points ?? 0);
+  }, 0);
 
-  const toggle = (itemId: string) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
+  const choose = (criterionId: string, itemId: string) => {
+    setSelected((prev) => ({ ...prev, [criterionId]: itemId }));
   };
 
   const save = async () => {
@@ -41,7 +42,7 @@ function GradingPanel({
     try {
       await api.post(
         `/api/admin/assignments/${assignment.id}/submissions/${item.submission.id}/grade`,
-        { checked_item_ids: Array.from(checked), comment: comment || null }
+        { selected_item_ids: Object.values(selected), comment: comment || null }
       );
       onSaved();
     } catch (e) {
@@ -92,7 +93,12 @@ function GradingPanel({
             <div className="mt-1 space-y-1 pl-2">
               {c.items.map((i) => (
                 <label key={i.id} className="flex items-center gap-2 text-sm text-gray-600">
-                  <input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} />
+                  <input
+                    type="radio"
+                    name={`criterion-${c.id}`}
+                    checked={selected[c.id] === i.id}
+                    onChange={() => choose(c.id, i.id)}
+                  />
                   {i.label}
                   <span className="text-xs text-gray-400">({i.points}점)</span>
                 </label>

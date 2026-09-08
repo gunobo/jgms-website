@@ -90,7 +90,7 @@ export function StudentAssignmentDetailPage() {
             <thead className="bg-gray-50 text-left text-gray-500">
               <tr>
                 <th className="px-3 py-2">평가 항목</th>
-                <th className="px-3 py-2">조건</th>
+                <th className="px-3 py-2">단계</th>
                 <th className="px-3 py-2 text-right">배점</th>
               </tr>
             </thead>

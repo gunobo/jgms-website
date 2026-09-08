@@ -80,7 +80,10 @@ export function AdminAssignmentBuilderPage() {
     );
   };
 
-  const maxScore = criteria.reduce((sum, c) => sum + c.items.reduce((s, item) => s + (item.points || 0), 0), 0);
+  const maxScore = criteria.reduce(
+    (sum, c) => sum + Math.max(0, ...c.items.map((item) => item.points || 0)),
+    0
+  );
 
   const save = async () => {
     setError(null);
@@ -94,7 +97,7 @@ export function AdminAssignmentBuilderPage() {
         return;
       }
       if (c.items.length === 0 || c.items.some((i) => !i.label.trim())) {
-        setError(`"${c.title}" 항목의 모든 조건에 내용을 입력해주세요.`);
+        setError(`"${c.title}" 항목의 모든 단계에 내용을 입력해주세요.`);
         return;
       }
     }
@@ -205,13 +208,15 @@ export function AdminAssignmentBuilderPage() {
             />
 
             <div className="space-y-2 pl-1">
-              <p className="text-xs font-medium text-gray-400">체크 조건</p>
+              <p className="text-xs font-medium text-gray-400">
+                점수 단계 (채점할 때 이 중 하나만 선택됩니다)
+              </p>
               {c.items.map((item, iIdx) => (
                 <div key={item.id} className="flex items-center gap-2">
                   <input
                     value={item.label}
                     onChange={(e) => updateItem(cIdx, iIdx, { label: e.target.value })}
-                    placeholder="조건 설명 (예: 변수명이 명확하게 작성됨)"
+                    placeholder="단계 설명 (예: 우수 - 변수명이 명확하고 구조가 좋음)"
                     className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm"
                   />
                   <input
@@ -235,7 +240,7 @@ export function AdminAssignmentBuilderPage() {
                 onClick={() => addItem(cIdx)}
                 className="text-xs font-medium text-blue-600 hover:text-blue-800"
               >
-                + 조건 추가
+                + 단계 추가
               </button>
             </div>
           </div>

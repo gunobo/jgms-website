@@ -2,6 +2,13 @@ services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
+    mem_limit: 200m
+    command:
+      - --innodb-buffer-pool-size=32M
+      - --innodb-log-buffer-size=4M
+      - --max-connections=20
+      - --performance-schema=OFF
+      - --table-open-cache=64
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_pw}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-jgms_club}
@@ -20,6 +27,7 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    mem_limit: 300m
     env_file:
       - ./backend/.env
     environment:
@@ -50,6 +58,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     restart: unless-stopped
+    mem_limit: 150m
     ports:
       - "5174:5173"
     depends_on:
